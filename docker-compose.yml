@@ -1,4 +1,5 @@
 services:
+<<<<<<< HEAD
   pgsql:
     container_name: pgsql
     image: postgres:15-alpine
@@ -29,6 +30,15 @@ services:
     container_name: middle_layer
     env_file:
       - ./.env.dev
+=======
+  middle_layer:
+    build:
+      context: .
+      dockerfile: Dockerfile.middle
+    container_name: middle_layer
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+>>>>>>> 0c726c0619ea5e6bc116b4104d6f41189bfa6af9
     volumes:
       - ./chat_pdf:/app
       - pdf_storage:/app/uploads  # Volume for PDF storage
@@ -36,10 +46,13 @@ services:
       - chroma_db:/app/chroma_db  # Volume for Chroma vector database
     ports:
       - "8000:8000"
+<<<<<<< HEAD
     depends_on:
       - pgsql
     networks:
       - app-network
+=======
+>>>>>>> 0c726c0619ea5e6bc116b4104d6f41189bfa6af9
     deploy:
       resources:
         limits:
@@ -48,6 +61,7 @@ services:
 
   streamlit_app:
     build:
+<<<<<<< HEAD
       context: ./streamlit_app  # Ensure this points to the streamlit_app folder
       dockerfile: Dockerfile.frontend
     container_name: streamlit_app
@@ -55,12 +69,24 @@ services:
       - ./.env.dev
     volumes:
       - ./streamlit_app:/app  # Correctly map to the streamlit_app folder
+=======
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: streamlit_app
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - .:/app
+>>>>>>> 0c726c0619ea5e6bc116b4104d6f41189bfa6af9
     ports:
       - "8501:8501"
     depends_on:
       - middle_layer
+<<<<<<< HEAD
     networks:
       - app-network
+=======
+>>>>>>> 0c726c0619ea5e6bc116b4104d6f41189bfa6af9
     deploy:
       resources:
         limits:
@@ -69,6 +95,7 @@ services:
 
   user_chat:
     build:
+<<<<<<< HEAD
       context: ./user_chat  # Ensure this points to the user_chat folder
       dockerfile: Dockerfile.user_chat
     container_name: user_chat
@@ -76,12 +103,24 @@ services:
       - ./.env.dev
     volumes:
       - ./user_chat:/app  # Correctly map to the user_chat folder
+=======
+      context: .
+      dockerfile: Dockerfile.user_chat
+    container_name: user_chat
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - .:/app
+>>>>>>> 0c726c0619ea5e6bc116b4104d6f41189bfa6af9
     ports:
       - "8502:8502"
     depends_on:
       - middle_layer
+<<<<<<< HEAD
     networks:
       - app-network
+=======
+>>>>>>> 0c726c0619ea5e6bc116b4104d6f41189bfa6af9
     deploy:
       resources:
         limits:
@@ -91,9 +130,13 @@ services:
 volumes:
   pdf_storage:  # Named volume for PDF storage
   vector_storage:  # Named volume for RAG vector data
+<<<<<<< HEAD
   chroma_db:  # Named volume for Chroma vector database
   postgres-data-volume:  # Named volume for PostgreSQL data
 
 networks:
   app-network:
     driver: bridge
+=======
+  chroma_db: # Named volume for Chroma vector database
+>>>>>>> 0c726c0619ea5e6bc116b4104d6f41189bfa6af9

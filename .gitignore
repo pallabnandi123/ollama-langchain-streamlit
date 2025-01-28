@@ -126,15 +126,21 @@ celerybeat.pid
 
 # Environments
 .env
+<<<<<<< HEAD
 .env.dev
 .env.prod
+=======
+>>>>>>> 0c726c0619ea5e6bc116b4104d6f41189bfa6af9
 .venv
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+<<<<<<< HEAD
 .idea/
+=======
+>>>>>>> 0c726c0619ea5e6bc116b4104d6f41189bfa6af9
 
 # Spyder project settings
 .spyderproject
@@ -165,5 +171,9 @@ cython_debug/
 #  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
+<<<<<<< HEAD
 .idea/
 *.key
+=======
+#.idea/
+>>>>>>> 0c726c0619ea5e6bc116b4104d6f41189bfa6af9

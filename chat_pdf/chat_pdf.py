@@ -21,10 +21,17 @@ from langchain.chains import LLMChain
 # import routes blueprint
 from routes import register_blueprints
 
+from langchain.embeddings.sentence_transformer import SentenceTransformerEmbeddings
+from langchain.vectorstores import Chroma
+from langchain.prompts import PromptTemplate
+from langchain.chat_models import ChatOpenAI
+
+
 # Load environment variables
 load_dotenv(".env.dev")
 
 app = Flask(__name__)
+
 
 # Register all blueprints
 register_blueprints(app)
@@ -33,6 +40,7 @@ register_blueprints(app)
 global_rag_data = None
 session_id = "abcd12345678"  # This ID can be dynamic if needed
 persist_directory = "/app/chroma_db/global"
+
 overwrite_embeddings = False  # make it False for use existing embeddings
 
 # Access the OpenAI API key
@@ -42,6 +50,7 @@ ORGANIZATION_ID = os.getenv("ORGANIZATION_ID")
 ORGANIZATION_NAME = os.getenv("ORGANIZATION_NAME")
 
 class ChatPDF:
+    
 
     def __init__(self):
         # Initialize the OpenAI Chat model
@@ -49,12 +58,16 @@ class ChatPDF:
             model="gpt-4o-mini",
             openai_api_key=OPENAI_API_KEY,
             organization=ORGANIZATION_ID,
+
             temperature=0.1,
             max_tokens=100,
         )
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1024, chunk_overlap=100
         )
+
+        self.text_splitter = RecursiveCharacterTextSplitter(chunk_size=1024, chunk_overlap=100)
+
         # create open ai embedding
         # self.embedding = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY, model="text-embedding-3-small")
         # create the open-source embedding function
@@ -84,6 +97,25 @@ class ChatPDF:
                 )
             else:
                 # If embedding doesn't exist or overwrite is True, initialize the database
+            <s> [INST] You are an expert assistant for a Low-Code/No-Code (LCNC) platform, designed to guide users in developing applications. 
+            Use the context provided below to answer the user's question with specific reference to how they can use the LCNC platform to achieve their goals. 
+            If the context doesn't provide enough information, state that clearly. Keep your response concise and informative. [/INST] </s> 
+            [INST] Question: {question} 
+            Context: {context} 
+            Answer: [/INST]
+            """
+        )
+
+
+    def ingest(self, pdf_file_path: str, session_id: str):
+        try:
+            # Check if the embedding already exists
+            if os.path.exists(persist_directory) and os.listdir(persist_directory):
+                print(f"Embedding already exists in {persist_directory}. Loading existing data...")
+                db = Chroma(persist_directory=persist_directory, embedding_function=self.embedding)
+            else:
+                # If embedding doesn't exist, initialize the database
+
                 docs = PyPDFLoader(file_path=pdf_file_path).load()
                 chunks = self.text_splitter.split_documents(docs)
                 print(f"New embedding chunks created: {len(chunks)}")
@@ -92,6 +124,9 @@ class ChatPDF:
                 db = Chroma.from_documents(
                     chunks, self.embedding, persist_directory=persist_directory
                 )
+                print(f"FAQ RAG data created and persisted in {persist_directory}.")
+
+                db = Chroma.from_documents(chunks, self.embedding, persist_directory=persist_directory)
                 print(f"FAQ RAG data created and persisted in {persist_directory}.")
 
             # Update global RAG data
@@ -134,6 +169,7 @@ class ChatPDF:
             if not matching_docs:
                 return jsonify({"response": "No relevant documents/result found."})
 
+
             # Define different prompt templates based on the question
             prompt_templates = {
                 "primary_field_template": PromptTemplate.from_template(
@@ -167,6 +203,18 @@ class ChatPDF:
             result = chain.invoke({"input_documents": matching_docs, "query": query})
             response_text = result.get("result", "No answer found.")
 
+            chain = RetrievalQA.from_chain_type(
+                llm=self.model,
+                retriever=db.as_retriever(),
+                chain_type='stuff',
+                chain_type_kwargs={"prompt": self.prompt_template},
+                return_source_documents=True,
+                verbose=True
+            )
+            result = chain.invoke({"input_documents": matching_docs, "query": query})
+            response_text = result.get('result', 'No answer found.')
+
+
             return jsonify({"response": response_text})
         except Exception as e:
             print(f"Error during query processing: {str(e)}")
@@ -183,6 +231,18 @@ def admin_ingest():
 
         chat_pdf = ChatPDF()
         result = chat_pdf.ingest(temp_file_path, session_id, overwrite_embeddings)
+
+@app.route('/ingest', methods=['POST'])
+def admin_ingest():
+    try:
+        pdf_file = request.files['file']
+        session_id = request.form.get('session_id', str(uuid.uuid4()))
+        temp_file_path = f'/tmp/{pdf_file.filename}'
+        pdf_file.save(temp_file_path)
+
+        chat_pdf = ChatPDF()
+        result = chat_pdf.ingest(temp_file_path, session_id)
+
         os.remove(temp_file_path)
 
         return result
@@ -219,6 +279,22 @@ def ask():
         response = chat_pdf.ask(
             session_id, query, prompt_template
         )  # Pass the template name to the ask method
+
+@app.route('/ask', methods=['POST'])
+def ask():
+    try:
+        data = request.json
+        session_id = data.get('session_id')
+        query = data.get('query')
+        
+        if not session_id:
+            return jsonify({"error": "Session ID is not set. Please ask the admin to upload the relevant documents."}), 400
+
+        print(f"ask API parameters - Session ID: {session_id}, Query: {query}")
+
+        chat_pdf = ChatPDF()
+        response = chat_pdf.ask(session_id, query)
+
         return response
     except Exception as e:
         print(f"Error during query processing: {str(e)}")
@@ -246,3 +322,15 @@ if __name__ == "__main__":
         print("Global RAG data loaded successfully.")
 
     app.run(host="0.0.0.0", port=8000, debug=True)
+
+if __name__ == '__main__':
+    # Initialize global RAG data if exists
+    if os.path.exists(persist_directory) and os.listdir(persist_directory):
+        # embedding_function = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY, model="text-embedding-3-small")
+        # create the open-source embedding function
+        embedding_function = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
+        global_rag_data = Chroma(persist_directory=persist_directory, embedding_function=embedding_function)
+        print("Global RAG data loaded successfully.")
+
+    app.run(host='0.0.0.0', port=8000)
+
