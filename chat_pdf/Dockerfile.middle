@@ -1,0 +1,52 @@
+# Use an official Python runtime as a parent image
+FROM python:3.11-slim AS base
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies including netcat (nc)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    build-essential \
+    gcc \
+    g++ \
+    netcat-openbsd \
+    postgresql-client && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create a virtual environment
+RUN python3.11 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Install stable dependencies first
+COPY requirements.middle.stable.txt ./
+RUN pip install --upgrade pip
+RUN pip --default-timeout=1000 install --no-cache-dir -r requirements.middle.stable.txt
+
+# Intermediate stage for application code and frequently changing dependencies
+FROM base AS middle_layer
+
+# Copy the more frequently changing requirements file
+COPY requirements.middle.txt ./
+RUN pip install --no-cache-dir -r requirements.middle.txt
+
+# Copy the entrypoint.sh script before chmod
+COPY entrypoint.sh /app/
+
+# Make the script executable
+RUN chmod +x /app/entrypoint.sh
+
+# Final stage for runtime
+FROM middle_layer AS final
+
+# Expose the application port
+EXPOSE 8000
+
+# Use entrypoint for the script
+ENTRYPOINT ["/app/entrypoint.sh"]

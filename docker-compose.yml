@@ -1,0 +1,99 @@
+services:
+  pgsql:
+    container_name: pgsql
+    image: postgres:15-alpine
+    volumes:
+      - postgres-data-volume:/var/lib/postgresql/data/
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password123
+    networks:
+      - app-network
+
+  adminer:
+    image: adminer
+    container_name: pgsql-adminer
+    ports:
+      - 8080:8080
+    depends_on:
+      - pgsql
+    networks:
+      - app-network
+
+  middle_layer:
+    build:
+      context: ./chat_pdf  # Change context to the chat_pdf folder
+      dockerfile: Dockerfile.middle  # Dockerfile name remains the same
+    container_name: middle_layer
+    env_file:
+      - ./.env.dev
+    volumes:
+      - ./chat_pdf:/app
+      - pdf_storage:/app/uploads  # Volume for PDF storage
+      - vector_storage:/app/vector_db  # Volume for RAG vector data
+      - chroma_db:/app/chroma_db  # Volume for Chroma vector database
+    ports:
+      - "8000:8000"
+    depends_on:
+      - pgsql
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2.00'
+          memory: 4G
+
+  streamlit_app:
+    build:
+      context: ./streamlit_app  # Ensure this points to the streamlit_app folder
+      dockerfile: Dockerfile.frontend
+    container_name: streamlit_app
+    env_file:
+      - ./.env.dev
+    volumes:
+      - ./streamlit_app:/app  # Correctly map to the streamlit_app folder
+    ports:
+      - "8501:8501"
+    depends_on:
+      - middle_layer
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: 2G
+
+  user_chat:
+    build:
+      context: ./user_chat  # Ensure this points to the user_chat folder
+      dockerfile: Dockerfile.user_chat
+    container_name: user_chat
+    env_file:
+      - ./.env.dev
+    volumes:
+      - ./user_chat:/app  # Correctly map to the user_chat folder
+    ports:
+      - "8502:8502"
+    depends_on:
+      - middle_layer
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: 2G
+
+volumes:
+  pdf_storage:  # Named volume for PDF storage
+  vector_storage:  # Named volume for RAG vector data
+  chroma_db:  # Named volume for Chroma vector database
+  postgres-data-volume:  # Named volume for PostgreSQL data
+
+networks:
+  app-network:
+    driver: bridge
