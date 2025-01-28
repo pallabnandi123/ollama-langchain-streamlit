@@ -26,14 +26,11 @@ This repository contains a Flask-based application using the Ollama and Phi3 mod
 2. **Build and run the Docker container:**
     ```bash
     sudo docker-compose up --build
-<<<<<<< HEAD
 
     or
     
     docker-compose --env-file .env.dev up --build --remove-orphans
 
-=======
->>>>>>> 0c726c0619ea5e6bc116b4104d6f41189bfa6af9
     ```
 
 3. **Pull the Phi3 or other model with the Ollama container:**
